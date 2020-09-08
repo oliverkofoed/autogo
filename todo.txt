@@ -1,0 +1,3 @@
+todo:
+	- self-insert _autogo/refresh.js (or?) in http stream
+	- should be able to run two at once, without having two webservers at the same time (and a library mode so you don't start listening and try to run stuff, but just build.)
