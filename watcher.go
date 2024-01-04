@@ -16,13 +16,13 @@ var monitored = make(map[string]map[*Watcher]bool) // directory path => true/fal
 var fsWatcher *fsnotify.Watcher
 
 type Watcher struct {
-	directories    map[string]bool
-	pattern        string
-	excludePattern string
-	timers         map[string]*time.Timer
-	timersLock     sync.RWMutex
-	triggerLock    sync.RWMutex
-	Changed        chan string
+	directories     map[string]bool
+	patterns        []string
+	excludePatterns []string
+	timers          map[string]*time.Timer
+	timersLock      sync.RWMutex
+	triggerLock     sync.RWMutex
+	Changed         chan string
 }
 
 func NewWatcher() *Watcher {
@@ -55,8 +55,18 @@ func (w *Watcher) Listen(directories map[string]bool, pattern string, excludePat
 
 	// save
 	w.directories = directories
-	w.pattern = pattern
-	w.excludePattern = excludePattern
+	w.patterns = make([]string, 0)
+	for _, str := range strings.Split(pattern, ",") {
+		if x := strings.TrimSpace(str); x != "" {
+			w.patterns = append(w.patterns, x)
+		}
+	}
+	w.excludePatterns = make([]string, 0)
+	for _, str := range strings.Split(excludePattern, ",") {
+		if x := strings.TrimSpace(str); x != "" {
+			w.excludePatterns = append(w.excludePatterns, x)
+		}
+	}
 }
 
 func match(pattern, path string) bool {
@@ -64,7 +74,7 @@ func match(pattern, path string) bool {
 	if !strings.Contains(pattern, "/") { // "*.something" or "somefile.ext" or "fdssf*fdsfs*.txt"
 		match, err := filepath.Match(pattern, filepath.Base(path))
 		if err != nil {
-			log.Fatal("Coudl not match paths.", err)
+			log.Fatal("Could not match paths.", err)
 			return false
 		}
 		return match
@@ -92,28 +102,33 @@ func match(pattern, path string) bool {
 }
 
 func (w *Watcher) trigger(path string) {
-	if match(w.pattern, path) {
-		if w.excludePattern != "" && match(w.excludePattern, path) {
+	for _, pattern := range w.patterns {
+		if match(pattern, path) {
+			for _, excludePattern := range w.excludePatterns {
+				if match(excludePattern, path) {
+					return
+				}
+			}
+
+			w.timersLock.Lock()
+
+			if w.timers[path] != nil {
+				w.timers[path].Stop()
+			}
+
+			stat, err := os.Stat(path)
+			if err != nil || time.Now().Sub(stat.ModTime()) < time.Second {
+				w.timers[path] = time.AfterFunc(time.Millisecond*250, func() {
+					// send the changed event
+					w.triggerLock.Lock()
+					w.Changed <- path
+					w.triggerLock.Unlock()
+				})
+			}
+
+			w.timersLock.Unlock()
 			return
 		}
-
-		w.timersLock.Lock()
-
-		if w.timers[path] != nil {
-			w.timers[path].Stop()
-		}
-
-		stat, err := os.Stat(path)
-		if err != nil || time.Now().Sub(stat.ModTime()) < time.Second {
-			w.timers[path] = time.AfterFunc(time.Millisecond*250, func() {
-				// send the changed event
-				w.triggerLock.Lock()
-				w.Changed <- path
-				w.triggerLock.Unlock()
-			})
-		}
-
-		w.timersLock.Unlock()
 	}
 }
 

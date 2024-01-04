@@ -49,8 +49,8 @@ func main() {
 
 	// increase ulimit
 	err := syscall.Setrlimit(syscall.RLIMIT_NOFILE, &syscall.Rlimit{
-		Cur: 1024 * 10,
-		Max: 1024 * 10,
+		Cur: 1024 * 50,
+		Max: 1024 * 50,
 	})
 	if err != nil {
 		log.Fatal(err)
