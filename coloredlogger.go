@@ -24,7 +24,12 @@ type ColoredLogger struct {
 	buffer         bytes.Buffer
 }
 
+var maxLength = 0
+
 func NewColoredLogger(name string, color string) *ColoredLogger {
+	if maxLength < len(name) {
+		maxLength = len(name)
+	}
 	return &ColoredLogger{name: name, color: color}
 }
 
@@ -41,7 +46,7 @@ func (c *ColoredLogger) Write(p []byte) (n int, err error) {
 			if c.unfinishedLine != nil {
 				str = *c.unfinishedLine + str
 			}
-			fmt.Printf("\033[%sm\033[%sm%20s: %s\033[%sm", ColorReset, c.color, c.name, str, ColorReset)
+			fmt.Printf("\033[%sm\033[%sm%"+fmt.Sprintf("%v", maxLength)+"s: %s\033[%sm", ColorReset, c.color, c.name, str, ColorReset)
 			c.unfinishedLine = nil
 		} else {
 			if c.unfinishedLine != nil {

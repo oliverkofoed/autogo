@@ -35,6 +35,7 @@ type Compiler struct {
 	Exclude    string `json:"exclude"`
 	Command    string `json:"command"`
 	WorkingDir string `json:"workingdir"`
+	RunOnStart bool   `json:"runonstart"`
 }
 
 func main() {
@@ -67,9 +68,10 @@ func main() {
 
 	if *wait > 0 {
 		for i := 0; i != *wait; i++ {
-			fmt.Println("running #", i)
+			fmt.Println("debug running #", i)
 			time.Sleep(time.Second)
 		}
+		fmt.Println("debug done. dying.")
 		return
 	}
 
@@ -77,22 +79,22 @@ func main() {
 	config := &AutoGoConfig{WatchRoot: "."}
 	if *libraryConfig {
 		config.Compilers = []*Compiler{
-			&Compiler{Name: "build", Pattern: "*.go", Command: "go build -o .tmp_autogo/autogo_build"},
+			{Name: "build", Pattern: "*.go", Command: "go build -o .tmp_autogo/autogo_build"},
 		}
 	} else if *testConfig {
 		config.Compilers = []*Compiler{
-			&Compiler{Name: "test", Pattern: "*.go", Command: "go test"},
+			{Name: "test", Pattern: "*.go", Command: "go test"},
 		}
 	} else {
 		config.Compilers = []*Compiler{
-			&Compiler{Name: "build", Pattern: "*.go", Command: "go build -o .tmp_autogo/autogo_build"},
-			&Compiler{Name: "template", Pattern: "*.tmpl", Command: ""},
+			{Name: "build", Pattern: "*.go", Command: "go build -o .tmp_autogo/autogo_build"},
+			{Name: "template", Pattern: "*.tmpl", Command: ""},
 		}
 		config.Runners = []*Runner{
-			&Runner{Name: "run", Command: ".tmp_autogo/autogo_build"},
+			{Name: "run", Command: ".tmp_autogo/autogo_build"},
 		}
 		config.HttpProxies = []*HttpProxy{
-			&HttpProxy{Listen: ":1984", Target: "http://127.0.0.1:3000"},
+			{Listen: ":1984", Target: "http://127.0.0.1:3000"},
 		}
 	}
 
@@ -179,6 +181,14 @@ func main() {
 			watcher := NewWatcher()
 			watcher.Listen(getFolders(root, compiler), compiler.Pattern, compiler.Exclude)
 
+			if compiler.RunOnStart {
+				commandString := compiler.Command
+				compile := NewCommand(compiler.Name, commandString, compiler.WorkingDir)
+				key := compiler.Name + commandString
+				compilers.StartCompile(key, compile)
+				compile.infoLog.Println("Building")
+			}
+
 			//getFiles := recursiveGet
 			for file := range watcher.Changed {
 				// start a compile cycle
@@ -198,8 +208,8 @@ func main() {
 	}
 
 	// keep running.
-	input := ""
-	fmt.Scanln(&input)
+	done := make(chan bool)
+	<-done
 }
 
 func getFolders(root string, compiler *Compiler) map[string]bool {
