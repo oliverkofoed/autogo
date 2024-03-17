@@ -226,6 +226,10 @@ func main() {
 func getFolders(root string, compiler *Compiler) map[string]bool {
 	result := make(map[string]bool)
 	err := filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			log.Println("autogo: error walking(" + path + "): " + err.Error())
+			return nil
+		}
 		if info.IsDir() {
 			if len(path) > 1 && strings.HasPrefix(filepath.Base(path), ".") {
 				return filepath.SkipDir
