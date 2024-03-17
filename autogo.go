@@ -158,9 +158,6 @@ func main() {
 	for _, compiler := range config.Compilers {
 		wg.Add(1)
 		go func(compiler *Compiler) {
-			// create a watcher to listen for changes
-			watcher := NewWatcher()
-			watcher.Listen(getFolders(root, compiler), compiler.Pattern, compiler.Exclude)
 
 			if compiler.RunOnStart {
 				commandString := compiler.Command
@@ -172,20 +169,25 @@ func main() {
 
 			wg.Done()
 
-			//getFiles := recursiveGet
-			for file := range watcher.Changed {
-				// start a compile cycle
-				commandString := strings.Replace(compiler.Command, "$filerelative", file[len(compiler.WorkingDir)+1:], 100)
-				commandString = strings.Replace(commandString, "$file", file, 100)
-				commandString = strings.Replace(commandString, "$wd", compiler.WorkingDir, 100)
-
-				compile := NewCommand(compiler.Name, commandString, compiler.WorkingDir, compiler.Replace)
-				key := compiler.Name + commandString
-				compilers.StartCompile(key, compile)
-				compile.infoLog.Println("Building")
-
-				// refresh listening targets.
+			if compiler.Pattern != "" {
+				// create a watcher to listen for changes
+				watcher := NewWatcher()
 				watcher.Listen(getFolders(root, compiler), compiler.Pattern, compiler.Exclude)
+				//getFiles := recursiveGet
+				for file := range watcher.Changed {
+					// start a compile cycle
+					commandString := strings.Replace(compiler.Command, "$filerelative", file[len(compiler.WorkingDir)+1:], 100)
+					commandString = strings.Replace(commandString, "$file", file, 100)
+					commandString = strings.Replace(commandString, "$wd", compiler.WorkingDir, 100)
+
+					compile := NewCommand(compiler.Name, commandString, compiler.WorkingDir, compiler.Replace)
+					key := compiler.Name + commandString
+					compilers.StartCompile(key, compile)
+					compile.infoLog.Println("Building")
+
+					// refresh listening targets.
+					watcher.Listen(getFolders(root, compiler), compiler.Pattern, compiler.Exclude)
+				}
 			}
 		}(compiler)
 	}
