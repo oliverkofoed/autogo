@@ -25,18 +25,20 @@ type AutoGoConfig struct {
 }
 
 type Runner struct {
-	Command    string `json:"command"`
-	Name       string `json:"name"`
-	WorkingDir string `json:"workingdir"`
+	Command    string            `json:"command"`
+	Name       string            `json:"name"`
+	WorkingDir string            `json:"workingdir"`
+	Replace    map[string]string `json:"replace"`
 }
 
 type Compiler struct {
-	Name       string `json:"name"`
-	Pattern    string `json:"pattern"`
-	Exclude    string `json:"exclude"`
-	Command    string `json:"command"`
-	WorkingDir string `json:"workingdir"`
-	RunOnStart bool   `json:"runonstart"`
+	Name       string            `json:"name"`
+	Pattern    string            `json:"pattern"`
+	Exclude    string            `json:"exclude"`
+	Command    string            `json:"command"`
+	WorkingDir string            `json:"workingdir"`
+	RunOnStart bool              `json:"runonstart"`
+	Replace    map[string]string `json:"replace"`
 }
 
 func main() {
@@ -162,7 +164,7 @@ func main() {
 
 			if compiler.RunOnStart {
 				commandString := compiler.Command
-				compile := NewCommand(compiler.Name, commandString, compiler.WorkingDir)
+				compile := NewCommand(compiler.Name, commandString, compiler.WorkingDir, compiler.Replace)
 				key := compiler.Name + commandString
 				compilers.StartCompile(key, compile)
 				compile.infoLog.Println("Building")
@@ -177,7 +179,7 @@ func main() {
 				commandString = strings.Replace(commandString, "$file", file, 100)
 				commandString = strings.Replace(commandString, "$wd", compiler.WorkingDir, 100)
 
-				compile := NewCommand(compiler.Name, commandString, compiler.WorkingDir)
+				compile := NewCommand(compiler.Name, commandString, compiler.WorkingDir, compiler.Replace)
 				key := compiler.Name + commandString
 				compilers.StartCompile(key, compile)
 				compile.infoLog.Println("Building")
@@ -194,7 +196,7 @@ func main() {
 	// runners run when: 1) no compilers running 2) no compile errors
 	for _, runner := range config.Runners {
 		go func(runner *Runner) {
-			cmd := NewCommand(runner.Name, runner.Command, runner.WorkingDir)
+			cmd := NewCommand(runner.Name, runner.Command, runner.WorkingDir, runner.Replace)
 
 			for {
 				stopped := make(chan error)

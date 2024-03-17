@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"io"
 	"os/exec"
 	"strings"
@@ -15,16 +16,18 @@ type Command struct {
 	commandString           string
 	cmd                     *exec.Cmd
 	workingDir              string
+	replacements            map[string]string
 	sync.Mutex
 }
 
-func NewCommand(name string, command string, workingDirectory string) *Command {
+func NewCommand(name string, command string, workingDirectory string, replacements map[string]string) *Command {
 	return &Command{
 		commandString: command,
 		workingDir:    workingDirectory,
 		infoLog:       NewColoredLogger(name, ColorGray),
 		stdLog:        NewColoredLogger(name, ColorWhite),
 		errLog:        NewColoredLogger(name, ColorRed),
+		replacements:  replacements,
 	}
 }
 
@@ -53,11 +56,13 @@ func (c *Command) Start(stopped chan error) { // non-blocking
 		defer tty.Close()
 		defer f.Close()
 
-		c.cmd.Stdout = tty
-		c.cmd.Stderr = tty /*&prefixWriter{
-			prefix:     []byte{},
-			underlying: tty,
-		}*/
+		if c.replacements != nil {
+			c.cmd.Stdout = &replacingWriter{underlying: tty, replacements: c.replacements}
+			c.cmd.Stderr = &replacingWriter{underlying: tty, replacements: c.replacements}
+		} else {
+			c.cmd.Stdout = tty
+			c.cmd.Stderr = tty
+		}
 		c.cmd.Stdin = tty
 
 		err = c.cmd.Start()
@@ -74,6 +79,18 @@ func (c *Command) Start(stopped chan error) { // non-blocking
 	}()
 
 	c.Unlock()
+}
+
+type replacingWriter struct {
+	underlying   io.Writer
+	replacements map[string]string
+}
+
+func (p *replacingWriter) Write(b []byte) (n int, err error) {
+	for old, new := range p.replacements {
+		b = bytes.ReplaceAll(b, []byte(old), []byte(new))
+	}
+	return p.underlying.Write(b)
 }
 
 type prefixWriter struct {
