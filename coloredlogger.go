@@ -15,6 +15,7 @@ const (
 	ColorMagenta = "35"
 	ColorCyan    = "36"
 	ColorWhite   = "37"
+	ColorGray    = "90"
 )
 
 type ColoredLogger struct {
@@ -46,7 +47,15 @@ func (c *ColoredLogger) Write(p []byte) (n int, err error) {
 			if c.unfinishedLine != nil {
 				str = *c.unfinishedLine + str
 			}
-			fmt.Printf("\033[%sm\033[%sm%"+fmt.Sprintf("%v", maxLength)+"s: %s\033[%sm", ColorReset, c.color, c.name, str, ColorReset)
+			if c.name == "" {
+				fmt.Printf("\033[%sm\033[%sm%s\033[%sm", ColorReset, c.color, str, ColorReset)
+			} else {
+				fo := c.color
+				if c.name != "" {
+					fo = ColorGray
+				}
+				fmt.Printf("\033[%sm%"+fmt.Sprintf("%v", maxLength)+"s:\033[%sm %s\033[%sm", fo, c.name, c.color, str, ColorReset)
+			}
 			c.unfinishedLine = nil
 		} else {
 			if c.unfinishedLine != nil {

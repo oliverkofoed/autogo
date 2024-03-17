@@ -12,6 +12,7 @@ import (
 	"path/filepath"
 	"runtime/pprof"
 	"strings"
+	"sync"
 	"syscall"
 	"time"
 )
@@ -146,36 +147,14 @@ func main() {
 		}
 	}
 
-	// start all runners.
-	// runners run when: 1) no compilers running 2) no compile errors
-	for _, runner := range config.Runners {
-		go func(runner *Runner) {
-			cmd := NewCommand(runner.Name, runner.Command, runner.WorkingDir)
-
-			for {
-				stopped := make(chan error)
-				go func() {
-					err := <-stopped
-					if err == nil {
-						cmd.stdLog.Println("<end>")
-					} else {
-						cmd.errLog.Println(fmt.Sprintf("<end: %s>", err))
-					}
-				}()
-				compilers.WaitForState(Idle)
-				cmd.Start(stopped)
-				compilers.WaitForState(Compiling)
-				cmd.Stop()
-			}
-		}(runner)
-	}
-
 	// listen for changes; run compilers when changed.
+	var wg sync.WaitGroup
 	root, err := filepath.Abs(config.WatchRoot)
 	if err != nil {
 		log.Panic("Could not watch directory: " + config.WatchRoot)
 	}
 	for _, compiler := range config.Compilers {
+		wg.Add(1)
 		go func(compiler *Compiler) {
 			// create a watcher to listen for changes
 			watcher := NewWatcher()
@@ -188,6 +167,8 @@ func main() {
 				compilers.StartCompile(key, compile)
 				compile.infoLog.Println("Building")
 			}
+
+			wg.Done()
 
 			//getFiles := recursiveGet
 			for file := range watcher.Changed {
@@ -205,6 +186,32 @@ func main() {
 				watcher.Listen(getFolders(root, compiler), compiler.Pattern, compiler.Exclude)
 			}
 		}(compiler)
+	}
+
+	wg.Wait()
+
+	// start all runners.
+	// runners run when: 1) no compilers running 2) no compile errors
+	for _, runner := range config.Runners {
+		go func(runner *Runner) {
+			cmd := NewCommand(runner.Name, runner.Command, runner.WorkingDir)
+
+			for {
+				stopped := make(chan error)
+				go func() {
+					err := <-stopped
+					if err == nil {
+						cmd.infoLog.Println("<end>")
+					} else {
+						cmd.infoLog.Println(fmt.Sprintf("<end: %s>", err))
+					}
+				}()
+				compilers.WaitForState(Idle)
+				cmd.Start(stopped)
+				compilers.WaitForState(Compiling)
+				cmd.Stop()
+			}
+		}(runner)
 	}
 
 	// keep running.

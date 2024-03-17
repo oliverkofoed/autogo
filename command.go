@@ -22,7 +22,7 @@ func NewCommand(name string, command string, workingDirectory string) *Command {
 	return &Command{
 		commandString: command,
 		workingDir:    workingDirectory,
-		infoLog:       NewColoredLogger(name, ColorReset),
+		infoLog:       NewColoredLogger(name, ColorGray),
 		stdLog:        NewColoredLogger(name, ColorWhite),
 		errLog:        NewColoredLogger(name, ColorRed),
 	}
