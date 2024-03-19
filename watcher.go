@@ -8,10 +8,11 @@ import (
 	"sync"
 	"time"
 
-	"gopkg.in/fsnotify.v1"
+	"github.com/fsnotify/fsnotify"
 )
 
 var updateLock sync.RWMutex
+var monitoredLock sync.RWMutex
 var monitored = make(map[string]map[*Watcher]bool) // directory path => true/false
 var fsWatcher *fsnotify.Watcher
 
@@ -135,6 +136,9 @@ func (w *Watcher) trigger(path string) {
 // ----------
 
 func startWatching(directory string, watcher *Watcher) {
+	monitoredLock.Lock()
+	defer monitoredLock.Unlock()
+
 	// create watcher if it does not exist already.
 	if fsWatcher == nil {
 		var err error
@@ -174,6 +178,9 @@ func startWatching(directory string, watcher *Watcher) {
 }
 
 func stopWatching(directory string, watcher *Watcher) {
+	monitoredLock.Lock()
+	defer monitoredLock.Unlock()
+
 	if watcherMap, ok := monitored[directory]; ok {
 		delete(watcherMap, watcher)
 	}
