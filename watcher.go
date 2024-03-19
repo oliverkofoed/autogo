@@ -153,7 +153,10 @@ func startWatching(directory string, watcher *Watcher) {
 					if ev.Op != fsnotify.Chmod {
 						dir := filepath.Dir(ev.Name)
 
-						if watcherMap, ok := monitored[dir]; ok {
+						monitoredLock.RLock()
+						watcherMap, ok := monitored[dir]
+						monitoredLock.RUnlock()
+						if ok {
 							for watcher := range watcherMap {
 								watcher.trigger(ev.Name)
 							}
